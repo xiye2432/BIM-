@@ -1,0 +1,1698 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BIM幕墙团队进度管理系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Microsoft YaHei', sans-serif; }
+        body { margin: 0; background-color: #f5f7fa; }
+
+        /* 登录和注册容器样式 */
+        .auth-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .auth-box {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            width: 400px;
+            max-width: 90%;
+        }
+        .auth-title {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #2c3e50;
+            font-size: 24px;
+        }
+        .auth-form input, .auth-form select {
+            width: 100%;
+            padding: 12px 15px;
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+        .auth-form input:focus, .auth-form select:focus {
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52,152,219,0.2);
+            outline: none;
+        }
+        .auth-form button {
+            width: 100%;
+            padding: 12px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .auth-error {
+            color: #e74c3c;
+            margin-bottom: 20px;
+            text-align: center;
+            padding: 10px;
+            background: rgba(231,76,60,0.1);
+            border-radius: 5px;
+        }
+        .auth-switch {
+            text-align: center;
+            margin-top: 20px;
+            color: #7f8c8d;
+        }
+        .auth-switch a {
+            color: #3498db;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        /* 主系统样式 */
+        #mainSystem {
+            display: none;
+            min-height: 100vh;
+        }
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .logout-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            max-width: 1400px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+            flex: 1;
+            min-width: 300px;
+        }
+        h2 { color: #3498db; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #eee; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 14px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #f8f9fa; }
+        .status-pending { color: #f39c12; }
+        .status-done { color: #2ecc71; }
+        .status-blocked { color: #e74c3c; }
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 2px;
+            font-size: 14px;
+        }
+        button.danger { background: #e74c3c; }
+        button.success { background: #2ecc71; }
+        button.warning { background: #f39c12; }
+        .task-input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .project-item {
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            background: #f8f9fa;
+        }
+        .gantt-bar {
+            height: 20px;
+            background: #3498db;
+            border-radius: 3px;
+            margin: 5px 0;
+        }
+        .admin-only { display: none; }
+        .staff-only { display: none; }
+
+        /* 团队任务表格优化 */
+        .team-tasks-table {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
+        .team-tasks-table table {
+            margin: 0;
+        }
+        .team-tasks-table th {
+            position: sticky;
+            top: 0;
+            background-color: #f8f9fa;
+            z-index: 10;
+        }
+        .team-tasks-table td {
+            padding: 8px 12px;
+            font-size: 13px;
+        }
+        .team-tasks-table .task-content {
+            max-width: 200px;
+            word-wrap: break-word;
+        }
+        .team-tasks-table .status-cell {
+            min-width: 80px;
+        }
+        .team-tasks-table .action-cell {
+            min-width: 120px;
+        }
+        .team-tasks-table .name-cell {
+            min-width: 80px;
+        }
+        .team-tasks-table .project-cell {
+            min-width: 120px;
+        }
+
+        /* 任务卡片样式 */
+        .task-card {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-left: 4px solid #3498db;
+        }
+        .task-card.completed {
+            border-left-color: #2ecc71;
+        }
+        .task-card.pending {
+            border-left-color: #f39c12;
+        }
+        .task-card.blocked {
+            border-left-color: #e74c3c;
+        }
+        .task-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .task-card-title {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .task-card-status {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .task-card-status.completed {
+            background: #d5f4e6;
+            color: #27ae60;
+        }
+        .task-card-status.pending {
+            background: #fef9e7;
+            color: #f39c12;
+        }
+        .task-card-status.blocked {
+            background: #fadbd8;
+            color: #e74c3c;
+        }
+        .task-card-content {
+            color: #7f8c8d;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        .task-card-actions {
+            margin-top: 8px;
+            display: flex;
+            gap: 5px;
+        }
+        .task-card-actions button {
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+
+        /* 视图切换按钮 */
+        .view-toggle {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        .view-toggle button {
+            padding: 8px 16px;
+            background: #ecf0f1;
+            color: #2c3e50;
+            border: 1px solid #bdc3c7;
+        }
+        .view-toggle button.active {
+            background: #3498db;
+            color: white;
+            border-color: #3498db;
+        }
+
+        /* 编辑模式样式 */
+        .edit-mode input, .edit-mode select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 100%;
+        }
+        .edit-buttons {
+            display: flex;
+            gap: 5px;
+        }
+    </style>
+</head>
+<body>
+<!-- 登录页面 -->
+<div class="auth-container" id="loginContainer">
+    <div class="auth-box">
+        <h2 class="auth-title">BIM幕墙团队进度管理系统</h2>
+        <div class="auth-error" id="loginError"></div>
+        <form class="auth-form" id="loginForm">
+            <input type="text" id="username" placeholder="真实姓名" required>
+            <input type="password" id="password" placeholder="密码" required>
+            <button type="submit">登录</button>
+        </form>
+        <div class="auth-switch">
+            还没有账号？<a onclick="showRegister()">立即注册</a>
+        </div>
+        <div style="text-align: center; margin-top: 20px; color: #7f8c8d;">
+            <div>管理员账号: 管理员 密码: 123456</div>
+            <div>测试账号: 张三 密码: 123</div>
+            <div>测试账号: 李四 密码: 123</div>
+        </div>
+        <input type="file" id="importFile" accept=".json" style="display: none;" onchange="handleFileImport(event)">
+    </div>
+</div>
+
+<!-- 注册页面 -->
+<div class="auth-container" id="registerContainer" style="display: none;">
+    <div class="auth-box">
+        <h2 class="auth-title">用户注册</h2>
+        <div class="auth-error" id="registerError"></div>
+        <form class="auth-form" id="registerForm">
+            <input type="text" id="regName" placeholder="真实姓名（将作为登录用户名）" required>
+            <input type="password" id="regPassword" placeholder="密码" required>
+            <input type="password" id="regConfirmPassword" placeholder="确认密码" required>
+            <button type="submit">注册</button>
+        </form>
+        <div class="auth-switch">
+            已有账号？<a onclick="showLogin()">立即登录</a>
+        </div>
+    </div>
+</div>
+
+<!-- 主系统内容 -->
+<div id="mainSystem">
+    <div class="header">
+        <h1>BIM幕墙团队进度管理系统</h1>
+        <div class="user-info">
+            <span>欢迎，<span id="currentUserName">用户</span> <small id="currentUserRole"></small></span>
+            <button onclick="exportData()" style="background: #27ae60; margin-right: 10px;">导出数据</button>
+            <button onclick="openCloudConfig()" style="background: #2980b9; margin-right: 10px;" id="cloudCfgBtn" style="display:none;">云端配置</button>
+            <button onclick="showAdminPanel()" style="background: #9b59b6; margin-right: 10px;" id="adminPanelBtn" style="display: none;">管理员面板</button>
+            <button class="logout-btn" onclick="logout()">退出登录</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- 每日任务填报 -->
+        <div class="card staff-only">
+            <h2>📅 今日任务填报</h2>
+            <form id="dailyForm">
+                <input type="date" id="taskDate" class="task-input" required>
+                <select id="staff" class="task-input" required>
+                    <option value="">--请选择--</option>
+                </select>
+                <select id="project" class="task-input" required>
+                    <option value="">--请选择--</option>
+                </select>
+                <select id="mainTask" class="task-input">
+                    <option value="">--选择任务类型--</option>
+                    <option value="完善设计">完善设计</option>
+                    <option value="优化设计">优化设计</option>
+                    <option value="结构模型">结构模型</option>
+                </select>
+                <input type="text" id="taskDesc" class="task-input" placeholder="任务具体描述">
+
+                <table id="taskTable">
+                    <thead>
+                    <tr>
+                        <th>任务内容</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                    </tr>
+                    </thead>
+                    <tbody id="taskTableBody"></tbody>
+                </table>
+                <button type="button" class="success" onclick="addTaskRow()">添加任务</button>
+                <button type="submit" class="success" style="float:right;">提交任务</button>
+            </form>
+        </div>
+
+        <!-- 项目总览 -->
+        <div class="card">
+            <h2>📌 项目总进度</h2>
+            <div style="margin: 20px 0;">
+                <canvas id="progressChart" height="200"></canvas>
+            </div>
+            <div id="projectGanttContainer"></div>
+            <h3>📝 今日团队任务</h3>
+            
+            <!-- 视图切换按钮 -->
+            <div class="view-toggle">
+                <button id="tableViewBtn" class="active" onclick="switchView('table')">表格视图</button>
+                <button id="cardViewBtn" onclick="switchView('card')">卡片视图</button>
+                <button onclick="viewAllTasks()" style="background: #9b59b6;">查看所有任务</button>
+                <button onclick="forceDeleteTask('1756261185209')" style="background: #e67e22;">删除问题任务</button>
+                <button onclick="fixTaskIdIssue()" style="background: #16a085;">修复ID问题</button>
+                <button onclick="clearAllTasks()" style="background: #e74c3c;">清空所有任务</button>
+            </div>
+            
+            <!-- 表格视图 -->
+            <div id="tableView" class="team-tasks-table">
+                <table>
+                    <thead>
+                    <tr>
+                        <th class="name-cell">姓名</th>
+                        <th class="project-cell">项目</th>
+                        <th class="task-content">任务内容</th>
+                        <th class="status-cell">状态</th>
+                        <th class="action-cell" id="adminActionHeader" style="display:none;">操作</th>
+                    </tr>
+                    </thead>
+                    <tbody id="teamTasksBody"></tbody>
+                </table>
+            </div>
+            
+            <!-- 卡片视图 -->
+            <div id="cardView" style="display: none;">
+                <div id="teamTasksCards"></div>
+            </div>
+        </div>
+
+        <!-- 项目管理 (管理员) -->
+        <div class="card admin-only">
+            <h2>📂 项目管理</h2>
+            <div>
+                <input type="text" id="newProjectName" placeholder="项目名称" class="task-input">
+                <input type="text" id="newProjectManager" placeholder="负责人" class="task-input">
+                <button onclick="addProject()" class="success">添加项目</button>
+            </div>
+            <h3>项目列表</h3>
+            <table>
+                <thead>
+                <tr>
+                    <th>项目名称</th>
+                    <th>进度</th>
+                    <th>负责人</th>
+                    <th>操作</th>
+                </tr>
+                </thead>
+                <tbody id="projectList"></tbody>
+            </table>
+        </div>
+
+        <!-- 人员管理 (管理员) -->
+        <div class="card admin-only">
+            <h2>👥 团队人员管理</h2>
+            <div>
+                <input type="text" id="newStaffName" placeholder="姓名" class="task-input">
+                <button onclick="addStaff()" class="success">添加成员</button>
+            </div>
+            <h3>成员列表</h3>
+            <table>
+                <thead>
+                <tr>
+                    <th>姓名</th>
+                    <th>参与项目</th>
+                    <th>操作</th>
+                </tr>
+                </thead>
+                <tbody id="staffList"></tbody>
+            </table>
+        </div>
+    </div>
+    <input type="file" id="importFileMain" accept=".json" style="display: none;" onchange="handleFileImport(event)">
+    <!-- 云端配置弹窗 -->
+    <div id="cloudConfigModal" style="display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); align-items:center; justify-content:center;">
+        <div style="background:#fff; padding:20px; border-radius:8px; width:420px;">
+            <h3>云端配置（Supabase）</h3>
+            <div style="margin:10px 0;">
+                <input id="cfgUrl" class="task-input" placeholder="Supabase URL"/>
+                <input id="cfgKey" class="task-input" placeholder="Supabase anon key"/>
+            </div>
+            <div style="display:flex; gap:8px; justify-content:flex-end;">
+                <button onclick="saveCloudConfig()" class="success">保存并同步</button>
+                <button onclick="manualPull()">从云端拉取</button>
+                <button onclick="manualPush()">推送到云端</button>
+                <button class="danger" onclick="closeCloudConfig()">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 数据存储键名
+    const DATA_KEY = 'bim_system_data';
+    const USERS_KEY = 'bim_system_users';
+    let currentUser = null;
+    let chart = null;
+    let editingTaskId = null;
+
+    // 云端配置（可在本地存储中设置 sb_url、sb_key）
+    const SUPABASE_URL = localStorage.getItem('sb_url') || '';
+    const SUPABASE_ANON_KEY = localStorage.getItem('sb_key') || '';
+    let sb = null; // Supabase 客户端
+
+    async function initCloud() {
+        if (!window.supabase || !SUPABASE_URL || !SUPABASE_ANON_KEY) return;
+        sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        try {
+            // 使用一张简单的 KV 表：app_kv(key text primary key, value jsonb)
+            // 这里假设已在 Supabase 控制台创建该表，并允许 anon 读写
+            await cloudPull();
+        } catch (e) {
+            console.warn('Cloud init failed:', e);
+        }
+    }
+
+    async function cloudPull() {
+        if (!sb) return;
+        const { data, error } = await sb.from('app_kv').select('key,value').in('key', [USERS_KEY, DATA_KEY]);
+        if (error) { console.warn('Cloud pull error', error); return; }
+        const map = Object.fromEntries((data || []).map(r => [r.key, r.value]));
+        if (map[USERS_KEY]) localStorage.setItem(USERS_KEY, JSON.stringify(map[USERS_KEY]));
+        if (map[DATA_KEY]) localStorage.setItem(DATA_KEY, JSON.stringify(map[DATA_KEY]));
+    }
+
+    async function cloudPush(key, value) {
+        if (!sb) return;
+        const payload = { key, value };
+        const { error } = await sb.from('app_kv').upsert(payload);
+        if (error) console.warn('Cloud push error', key, error);
+    }
+
+    function saveUsers(users) {
+        saveUsers(users);
+        cloudPush(USERS_KEY, users);
+    }
+
+    // 简单的密码加密函数
+    function simpleEncrypt(password) {
+        return btoa(encodeURIComponent(password));
+    }
+
+    // 简单的密码解密函数
+    function simpleDecrypt(encrypted) {
+        return decodeURIComponent(atob(encrypted));
+    }
+
+    // 初始化系统
+    document.addEventListener('DOMContentLoaded', async function() {
+        // 云端优先：如配置了 Supabase，则先从云端拉取覆盖本地
+        await initCloud();
+        // 确保初始化数据（若云端没有数据会走本地初始化）
+        initSystemData();
+        initUsersData();
+
+        // 设置测试账号
+        document.getElementById('username').value = '管理员';
+        document.getElementById('password').value = '123456';
+
+        initLogin();
+        initRegister();
+    });
+
+    // 初始化用户数据
+    function initUsersData() {
+        let users = JSON.parse(localStorage.getItem(USERS_KEY) || '{}');
+        
+        // 确保管理员账号存在
+        if (!users['管理员']) {
+            users['管理员'] = {
+                name: '管理员',
+                password: simpleEncrypt('123456'),
+                role: 'admin'
+            };
+        }
+        
+        // 确保测试账号存在
+        if (!users['张三']) {
+            users['张三'] = {
+                name: '张三',
+                password: simpleEncrypt('123'),
+                role: 'staff'
+            };
+        }
+        
+        if (!users['李四']) {
+            users['李四'] = {
+                name: '李四',
+                password: simpleEncrypt('123'),
+                role: 'staff'
+            };
+        }
+        
+        localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    }
+
+    // 初始化系统数据
+    function initSystemData() {
+        if (!localStorage.getItem(DATA_KEY)) {
+            const data = {
+                projects: [
+                    { id: 1, name: "上海金融中心幕墙", progress: 65, manager: "张三" },
+                    { id: 2, name: "杭州亚运场馆外立面", progress: 30, manager: "李四" }
+                ],
+                staff: [
+                    {
+                        id: 1,
+                        name: "张三",
+                        projects: [1]
+                    },
+                    {
+                        id: 2,
+                        name: "李四",
+                        projects: [2]
+                    }
+                ],
+                tasks: [
+                    {
+                        id: 1,
+                        date: new Date().toISOString().split('T')[0],
+                        staff: 1,
+                        project: 1,
+                        tasks: [
+                            { mainTask: "优化设计", description: "幕墙结构优化", status: "进行中" }
+                        ]
+                    },
+                    {
+                        id: 2,
+                        date: new Date().toISOString().split('T')[0],
+                        staff: 2,
+                        project: 2,
+                        tasks: [
+                            { mainTask: "完善设计", description: "外立面细节完善", status: "已完成" }
+                        ]
+                    }
+                ]
+            };
+            localStorage.setItem(DATA_KEY, JSON.stringify(data));
+        }
+    }
+
+    // 初始化登录功能
+    function initLogin() {
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            const users = JSON.parse(localStorage.getItem(USERS_KEY) || '{}');
+
+            if (users[username] && simpleDecrypt(users[username].password) === password) {
+                currentUser = {
+                    username: username,
+                    name: users[username].name,
+                    role: users[username].role
+                };
+                showMainSystem();
+            } else {
+                document.getElementById('loginError').textContent = '用户名或密码错误';
+            }
+        });
+    }
+
+    // 初始化注册功能
+    function initRegister() {
+        document.getElementById('registerForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const name = document.getElementById('regName').value;
+            const password = document.getElementById('regPassword').value;
+            const confirmPassword = document.getElementById('regConfirmPassword').value;
+
+            if (password !== confirmPassword) {
+                document.getElementById('registerError').textContent = '两次输入的密码不一致';
+                return;
+            }
+
+            const users = JSON.parse(localStorage.getItem(USERS_KEY) || '{}');
+
+            if (users[name]) {
+                document.getElementById('registerError').textContent = '该姓名已被注册';
+                return;
+            }
+
+            // 添加新用户 - 使用真实姓名作为用户名
+            users[name] = {
+                name: name,
+                password: simpleEncrypt(password),
+                role: 'staff'  // 默认注册为普通成员
+            };
+
+            saveUsers(users);
+
+            // 同时添加到系统数据中的staff列表
+            const data = getSystemData();
+            const newStaff = {
+                id: Date.now(),
+                name: name,
+                projects: []
+            };
+            data.staff.push(newStaff);
+            saveSystemData(data);
+
+            alert('注册成功，请使用真实姓名登录');
+            showLogin();
+        });
+    }
+
+    // 显示注册页面
+    function showRegister() {
+        document.getElementById('loginContainer').style.display = 'none';
+        document.getElementById('registerContainer').style.display = 'flex';
+        document.getElementById('registerError').textContent = '';
+        document.getElementById('registerForm').reset();
+    }
+
+    // 显示登录页面
+    function showLogin() {
+        document.getElementById('registerContainer').style.display = 'none';
+        document.getElementById('loginContainer').style.display = 'flex';
+        document.getElementById('loginError').textContent = '';
+        document.getElementById('loginForm').reset();
+    }
+
+    // 获取系统数据
+    function getSystemData() {
+        return JSON.parse(localStorage.getItem(DATA_KEY));
+    }
+
+    // 保存系统数据
+    function saveSystemData(data) {
+        localStorage.setItem(DATA_KEY, JSON.stringify(data));
+        cloudPush(DATA_KEY, data);
+    }
+
+    // 显示主系统
+    function showMainSystem() {
+        document.getElementById('loginError').textContent = '';
+        document.getElementById('loginContainer').style.display = 'none';
+        document.getElementById('mainSystem').style.display = 'block';
+        document.getElementById('currentUserName').textContent = currentUser.name;
+        document.getElementById('currentUserRole').textContent = `(${currentUser.role === 'admin' ? '管理员' : '成员'})`;
+
+        // 权限控制
+        const isAdmin = currentUser.role === 'admin';
+        document.querySelectorAll('.admin-only').forEach(el => {
+            el.style.display = isAdmin ? 'block' : 'none';
+        });
+        document.querySelectorAll('.staff-only').forEach(el => {
+            el.style.display = 'block'; // 成员和管理员都能看到
+        });
+
+        // 显示管理员操作列
+        document.getElementById('adminActionHeader').style.display = isAdmin ? 'table-cell' : 'none';
+        
+        // 显示管理员面板按钮
+        const adminPanelBtn = document.getElementById('adminPanelBtn');
+        if (adminPanelBtn) {
+            adminPanelBtn.style.display = isAdmin ? 'inline-block' : 'none';
+        }
+        const cloudCfgBtn = document.getElementById('cloudCfgBtn');
+        if (cloudCfgBtn) cloudCfgBtn.style.display = isAdmin ? 'inline-block' : 'none';
+
+        initMainSystem();
+    }
+
+    // 云端配置 UI
+    function openCloudConfig() {
+        document.getElementById('cfgUrl').value = localStorage.getItem('sb_url') || '';
+        document.getElementById('cfgKey').value = localStorage.getItem('sb_key') || '';
+        document.getElementById('cloudConfigModal').style.display = 'flex';
+    }
+    function closeCloudConfig() {
+        document.getElementById('cloudConfigModal').style.display = 'none';
+    }
+    async function saveCloudConfig() {
+        const url = document.getElementById('cfgUrl').value.trim();
+        const key = document.getElementById('cfgKey').value.trim();
+        localStorage.setItem('sb_url', url);
+        localStorage.setItem('sb_key', key);
+        alert('已保存云端配置，开始同步...');
+        await initCloud();
+        await manualPush();
+        closeCloudConfig();
+    }
+    async function manualPull() { await cloudPull(); alert('已从云端拉取完成'); }
+    async function manualPush() {
+        const users = JSON.parse(localStorage.getItem(USERS_KEY) || '{}');
+        const data = JSON.parse(localStorage.getItem(DATA_KEY) || '{}');
+        await cloudPush(USERS_KEY, users);
+        await cloudPush(DATA_KEY, data);
+        alert('已推送到云端');
+    }
+
+    // 初始化主系统
+    function initMainSystem() {
+        // 先对齐用户与成员数据，并规范化 ID 类型
+        reconcileUsersAndStaff();
+        normalizeDataIds();
+        const data = getSystemData();
+
+        // 设置默认日期为今天
+        document.getElementById('taskDate').valueAsDate = new Date();
+
+        // 初始化团队成员下拉菜单
+        updateStaffSelect(data.staff);
+
+        // 如果是普通成员，自动选择自己
+        if(currentUser.role === 'staff') {
+            const staff = data.staff.find(s => s.name === currentUser.name);
+            if(staff) {
+                document.getElementById('staff').value = staff.id;
+                document.getElementById('staff').disabled = true;
+            }
+        }
+
+        // 初始化项目下拉菜单
+        updateProjectSelect(data.projects);
+
+        // 初始化图表
+        initChart(data.projects);
+
+        // 初始化今日团队任务表格
+        updateTeamTasksTable(data.tasks);
+
+        // 初始化项目列表
+        updateProjectList(data.projects);
+
+        // 初始化成员列表
+        updateStaffList(data.staff, data.projects);
+
+        // 初始化项目甘特图
+        updateProjectGantt(data.projects);
+
+        // 绑定表单提交事件
+        document.getElementById('dailyForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            submitDailyForm(data);
+        });
+    }
+
+    // 更新人员下拉菜单
+    function updateStaffSelect(staff) {
+        const staffSelect = document.getElementById('staff');
+        const options = (staff || [])
+            .filter(s => s.name !== '管理员')
+            .map(s => `<option value="${s.id}">${s.name}</option>`)
+            .join('');
+        staffSelect.innerHTML = '<option value="">--请选择--</option>' + options;
+    }
+
+    // 更新项目下拉菜单
+    function updateProjectSelect(projects) {
+        const projectSelect = document.getElementById('project');
+        projectSelect.innerHTML = '<option value="">--请选择--</option>' +
+            projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    }
+
+    // 初始化图表
+    function initChart(projects) {
+        const ctx = document.getElementById('progressChart').getContext('2d');
+        if (chart) chart.destroy();
+
+        chart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: projects.map(p => p.name),
+                datasets: [{
+                    label: '项目进度 (%)',
+                    data: projects.map(p => p.progress),
+                    backgroundColor: projects.map(p =>
+                        p.progress > 70 ? '#2ecc71' :
+                            p.progress > 30 ? '#3498db' : '#e74c3c'
+                    ),
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // 更新项目列表
+    function updateProjectList(projects) {
+        const tbody = document.getElementById('projectList');
+        tbody.innerHTML = '';
+
+        projects.forEach(p => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                    <td>${p.name}</td>
+                    <td>${p.progress}%</td>
+                    <td>${p.manager}</td>
+                    <td><button class="danger" onclick="deleteProject(${p.id})">删除</button></td>
+                `;
+            tbody.appendChild(row);
+        });
+    }
+
+    // 更新成员列表
+    function updateStaffList(staff, projects) {
+        const tbody = document.getElementById('staffList');
+        tbody.innerHTML = '';
+        const visibleStaff = (staff || []).filter(s => s.name !== '管理员');
+        visibleStaff.forEach(s => {
+            const projectNames = s.projects.map(pid =>
+                projects.find(p => p.id === pid)?.name || pid
+            ).join(', ');
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                    <td>${s.name}</td>
+                    <td>${projectNames || '无'}</td>
+                    <td>
+                        <button class="danger" onclick="deleteStaff(${s.id})">删除</button>
+                    </td>
+                `;
+            tbody.appendChild(row);
+        });
+    }
+
+    // 更新团队任务表格
+    function updateTeamTasksTable(tasks) {
+        const today = new Date().toISOString().split('T')[0];
+        const data = getSystemData();
+        const todayTasks = tasks.filter(t => t.date === today);
+
+        const tbody = document.getElementById('teamTasksBody');
+        tbody.innerHTML = '';
+
+        const cardsContainer = document.getElementById('teamTasksCards');
+        cardsContainer.innerHTML = '';
+
+        todayTasks.forEach(task => {
+            // 兼容字符串/数字类型不一致，转为字符串比较
+            const staff = data.staff.find(s => String(s.id) === String(task.staff));
+            const project = data.projects.find(p => p.id === task.project);
+
+            task.tasks.forEach((t, index) => {
+                const taskId = `${task.id}-${index}`;
+                const statusClass = t.status === '已完成' ? 'done' : t.status === '进行中' ? 'pending' : 'blocked';
+                const cardStatusClass = t.status === '已完成' ? 'completed' : t.status === '进行中' ? 'pending' : 'blocked';
+
+                // 表格行
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                        <td class="name-cell">${staff?.name || task.staff}</td>
+                        <td class="project-cell">${project?.name || task.project}</td>
+                        <td class="task-content">${t.mainTask}: ${t.description}</td>
+                        <td class="status-cell status-${statusClass}">${t.status}</td>
+                        ${currentUser.role === 'admin' ?
+                    `<td class="action-cell edit-buttons">
+                                <button class="warning" onclick="editTask('${taskId}')">编辑</button>
+                                <button class="danger" onclick="deleteTask('${taskId}')">删除</button>
+                            </td>` : ''
+                }
+                    `;
+                tbody.appendChild(row);
+
+                // 卡片视图
+                const card = document.createElement('div');
+                card.className = `task-card ${cardStatusClass}`;
+                card.innerHTML = `
+                    <div class="task-card-header">
+                        <div class="task-card-title">${staff?.name || task.staff} - ${project?.name || task.project}</div>
+                        <div class="task-card-status ${cardStatusClass}">${t.status}</div>
+                    </div>
+                    <div class="task-card-content">
+                        <strong>${t.mainTask}:</strong> ${t.description}
+                    </div>
+                    ${currentUser.role === 'admin' ?
+                    `<div class="task-card-actions">
+                        <button class="warning" onclick="editTask('${taskId}')">编辑</button>
+                        <button class="danger" onclick="deleteTask('${taskId}')">删除</button>
+                    </div>` : ''
+                }
+                `;
+                cardsContainer.appendChild(card);
+            });
+        });
+    }
+
+    // 规范化数据中的 ID 类型，确保为数字，避免匹配失败
+    function normalizeDataIds() {
+        const data = getSystemData();
+        if (!data) return;
+        let changed = false;
+
+        if (Array.isArray(data.staff)) {
+            data.staff.forEach(s => {
+                if (s && typeof s.id === 'string') {
+                    const n = parseInt(s.id);
+                    if (!Number.isNaN(n)) { s.id = n; changed = true; }
+                }
+            });
+        }
+
+        if (Array.isArray(data.tasks)) {
+            data.tasks.forEach(t => {
+                if (t && typeof t.staff === 'string') {
+                    const n = parseInt(t.staff);
+                    if (!Number.isNaN(n)) { t.staff = n; changed = true; }
+                }
+            });
+        }
+
+        if (changed) {
+            saveSystemData(data);
+        }
+    }
+
+    // 对齐 users 与 systemData.staff，确保每个用户在成员列表中
+    function reconcileUsersAndStaff() {
+        const users = JSON.parse(localStorage.getItem(USERS_KEY) || '{}');
+        const data = getSystemData();
+        if (!data) return;
+
+        let changed = false;
+        // 先移除误加进来的管理员项
+        data.staff = (data.staff || []).filter(s => s.name !== '管理员');
+        const staffNames = new Set((data.staff || []).map(s => s.name));
+
+        Object.keys(users).forEach(username => {
+            const user = users[username];
+            if (!user) return;
+            if (!staffNames.has(user.name)) {
+                const newStaff = { id: Date.now(), name: user.name, projects: [] };
+                if (!Array.isArray(data.staff)) data.staff = [];
+                data.staff.push(newStaff);
+                staffNames.add(user.name);
+                changed = true;
+            }
+        });
+
+        if (changed) {
+            saveSystemData(data);
+        }
+    }
+
+    // 编辑任务
+    function editTask(taskId) {
+        if (editingTaskId) {
+            alert('请先完成当前编辑任务');
+            return;
+        }
+
+        editingTaskId = taskId;
+        const [taskIndex, subTaskIndex] = taskId.split('-').map(Number);
+        const data = getSystemData();
+        const task = data.tasks.find(t => t.id === taskIndex);
+
+        if (!task) return;
+
+        const subTask = task.tasks[subTaskIndex];
+        
+        // 查找表格中的行
+        const tableRow = document.querySelector(`#teamTasksBody tr:has(button[onclick="editTask('${taskId}')"])`);
+        if (tableRow) {
+            tableRow.classList.add('edit-mode');
+            tableRow.innerHTML = `
+                    <td class="name-cell">
+                        <select id="editStaff-${taskId}">
+                            ${data.staff.map(s => `<option value="${s.id}" ${s.id === task.staff ? 'selected' : ''}>${s.name}</option>`).join('')}
+                        </select>
+                    </td>
+                    <td class="project-cell">
+                        <select id="editProject-${taskId}">
+                            ${data.projects.map(p => `<option value="${p.id}" ${p.id === task.project ? 'selected' : ''}>${p.name}</option>`).join('')}
+                        </select>
+                    </td>
+                    <td class="task-content">
+                        <input type="text" id="editTaskDesc-${taskId}" value="${subTask.mainTask}: ${subTask.description}">
+                    </td>
+                    <td class="status-cell">
+                        <select id="editStatus-${taskId}">
+                            <option value="未开始" ${subTask.status === '未开始' ? 'selected' : ''}>未开始</option>
+                            <option value="进行中" ${subTask.status === '进行中' ? 'selected' : ''}>进行中</option>
+                            <option value="已完成" ${subTask.status === '已完成' ? 'selected' : ''}>已完成</option>
+                            <option value="已阻塞" ${subTask.status === '已阻塞' ? 'selected' : ''}>已阻塞</option>
+                        </select>
+                    </td>
+                    <td class="action-cell edit-buttons">
+                        <button class="success" onclick="saveTask('${taskId}')">保存</button>
+                        <button class="danger" onclick="cancelEdit('${taskId}')">取消</button>
+                    </td>
+                `;
+        }
+
+        // 同时更新卡片视图中的对应卡片
+        const cardElement = document.querySelector(`#teamTasksCards .task-card:has(button[onclick="editTask('${taskId}')"])`);
+        if (cardElement) {
+            cardElement.innerHTML = `
+                <div class="task-card-header">
+                    <div class="task-card-title">编辑任务</div>
+                </div>
+                <div style="margin-bottom: 10px;">
+                    <select id="editStaffCard-${taskId}" style="width: 100%; margin-bottom: 5px;">
+                        ${data.staff.map(s => `<option value="${s.id}" ${s.id === task.staff ? 'selected' : ''}>${s.name}</option>`).join('')}
+                    </select>
+                    <select id="editProjectCard-${taskId}" style="width: 100%; margin-bottom: 5px;">
+                        ${data.projects.map(p => `<option value="${p.id}" ${p.id === task.project ? 'selected' : ''}>${p.name}</option>`).join('')}
+                    </select>
+                    <input type="text" id="editTaskDescCard-${taskId}" value="${subTask.mainTask}: ${subTask.description}" style="width: 100%; margin-bottom: 5px;">
+                    <select id="editStatusCard-${taskId}" style="width: 100%; margin-bottom: 5px;">
+                        <option value="未开始" ${subTask.status === '未开始' ? 'selected' : ''}>未开始</option>
+                        <option value="进行中" ${subTask.status === '进行中' ? 'selected' : ''}>进行中</option>
+                        <option value="已完成" ${subTask.status === '已完成' ? 'selected' : ''}>已完成</option>
+                        <option value="已阻塞" ${subTask.status === '已阻塞' ? 'selected' : ''}>已阻塞</option>
+                    </select>
+                </div>
+                <div class="task-card-actions">
+                    <button class="success" onclick="saveTask('${taskId}')">保存</button>
+                    <button class="danger" onclick="cancelEdit('${taskId}')">取消</button>
+                </div>
+            `;
+        }
+    }
+
+    // 保存任务编辑
+    function saveTask(taskId) {
+        const [taskIndex, subTaskIndex] = taskId.split('-').map(Number);
+        const data = getSystemData();
+        const task = data.tasks.find(t => t.id === taskIndex);
+
+        if (!task) return;
+
+        // 尝试从表格视图获取数据
+        let staffId, projectId, taskDesc, status;
+        
+        const staffElement = document.getElementById(`editStaff-${taskId}`);
+        const projectElement = document.getElementById(`editProject-${taskId}`);
+        const taskDescElement = document.getElementById(`editTaskDesc-${taskId}`);
+        const statusElement = document.getElementById(`editStatus-${taskId}`);
+
+        // 如果表格视图的元素存在，使用表格视图的数据
+        if (staffElement && projectElement && taskDescElement && statusElement) {
+            staffId = parseInt(staffElement.value);
+            projectId = parseInt(projectElement.value);
+            taskDesc = taskDescElement.value;
+            status = statusElement.value;
+        } else {
+            // 否则使用卡片视图的数据
+            staffId = parseInt(document.getElementById(`editStaffCard-${taskId}`).value);
+            projectId = parseInt(document.getElementById(`editProjectCard-${taskId}`).value);
+            taskDesc = document.getElementById(`editTaskDescCard-${taskId}`).value;
+            status = document.getElementById(`editStatusCard-${taskId}`).value;
+        }
+
+        // 更新任务信息
+        task.staff = staffId;
+        task.project = projectId;
+
+        const [mainTask, description] = taskDesc.split(':');
+        task.tasks[subTaskIndex].mainTask = mainTask.trim();
+        task.tasks[subTaskIndex].description = description ? description.trim() : '';
+        task.tasks[subTaskIndex].status = status;
+
+        saveSystemData(data);
+        cloudPush(DATA_KEY, data);
+        editingTaskId = null;
+
+        // 刷新界面
+        updateTeamTasksTable(data.tasks);
+        updateProjectGantt(data.projects);
+        initChart(data.projects);
+
+        alert('任务更新成功！');
+    }
+
+    // 取消编辑
+    function cancelEdit(taskId) {
+        editingTaskId = null;
+        updateTeamTasksTable(getSystemData().tasks);
+    }
+
+    // 删除任务
+    function deleteTask(taskId) {
+        if (!confirm('确定要删除这个任务吗？')) return;
+
+        const [taskIndex, subTaskIndex] = taskId.split('-').map(Number);
+        const data = getSystemData();
+        const task = data.tasks.find(t => t.id === taskIndex);
+
+        if (!task) return;
+
+        // 删除子任务
+        task.tasks.splice(subTaskIndex, 1);
+
+        // 如果没有子任务了，删除整个任务
+        if (task.tasks.length === 0) {
+            data.tasks = data.tasks.filter(t => t.id !== taskIndex);
+        }
+
+        saveSystemData(data);
+        cloudPush(DATA_KEY, data);
+        updateTeamTasksTable(data.tasks);
+        updateProjectGantt(data.projects);
+        initChart(data.projects);
+        alert('任务删除成功！');
+    }
+
+    // 强制删除特定任务（用于调试）
+    function forceDeleteTask(taskId) {
+        if (!confirm(`确定要强制删除任务ID为 ${taskId} 的任务吗？`)) return;
+        
+        const data = getSystemData();
+        console.log('删除前的任务数据:', data.tasks);
+        
+        // 检查任务是否存在
+        const taskExists = data.tasks.some(t => t.id === parseInt(taskId));
+        if (!taskExists) {
+            alert(`任务ID ${taskId} 不存在！`);
+            return;
+        }
+        
+        // 直接通过ID删除任务
+        data.tasks = data.tasks.filter(t => t.id !== parseInt(taskId));
+        
+        console.log('删除后的任务数据:', data.tasks);
+        saveSystemData(data);
+        cloudPush(DATA_KEY, data);
+        
+        // 刷新界面
+        updateTeamTasksTable(data.tasks);
+        updateProjectGantt(data.projects);
+        initChart(data.projects);
+        
+        alert(`任务ID ${taskId} 已强制删除！`);
+        
+        // 强制刷新页面以确保数据更新
+        setTimeout(() => {
+            location.reload();
+        }, 1000);
+    }
+
+    // 查看所有任务（用于调试）
+    function viewAllTasks() {
+        const data = getSystemData();
+        console.log('所有任务数据:', data.tasks);
+        
+        let taskInfo = '当前所有任务:\n';
+        data.tasks.forEach(task => {
+            taskInfo += `任务ID: ${task.id}, 日期: ${task.date}, 员工ID: ${task.staff}\n`;
+            task.tasks.forEach((subTask, index) => {
+                taskInfo += `  - 子任务${index}: ${subTask.mainTask} - ${subTask.description} (${subTask.status})\n`;
+            });
+        });
+        
+        alert(taskInfo);
+    }
+
+    // 清空所有任务（紧急清理功能）
+    function clearAllTasks() {
+        if (!confirm('⚠️ 警告：这将删除所有任务数据！确定要继续吗？')) return;
+        
+        const data = getSystemData();
+        data.tasks = [];
+        saveSystemData(data);
+        cloudPush(DATA_KEY, data);
+        
+        // 刷新界面
+        updateTeamTasksTable(data.tasks);
+        updateProjectGantt(data.projects);
+        initChart(data.projects);
+        
+        alert('所有任务已清空！');
+        
+        // 强制刷新页面
+        setTimeout(() => {
+            location.reload();
+        }, 1000);
+    }
+
+    // 修复任务ID问题（处理字符串和数字类型不匹配）
+    function fixTaskIdIssue() {
+        const data = getSystemData();
+        console.log('修复前的任务数据:', data.tasks);
+        
+        // 确保所有任务ID都是数字类型
+        data.tasks.forEach(task => {
+            if (typeof task.id === 'string') {
+                task.id = parseInt(task.id);
+            }
+        });
+        
+        // 删除特定的问题任务（尝试多种方式）
+        const targetId = 1756261185209;
+        data.tasks = data.tasks.filter(t => {
+            const taskId = typeof t.id === 'string' ? parseInt(t.id) : t.id;
+            return taskId !== targetId;
+        });
+        
+        console.log('修复后的任务数据:', data.tasks);
+        saveSystemData(data);
+        
+        // 刷新界面
+        updateTeamTasksTable(data.tasks);
+        updateProjectGantt(data.projects);
+        initChart(data.projects);
+        
+        alert('任务ID问题已修复，问题任务已删除！');
+        
+        // 强制刷新页面
+        setTimeout(() => {
+            location.reload();
+        }, 1000);
+    }
+
+    // 视图切换功能
+    function switchView(viewType) {
+        const tableView = document.getElementById('tableView');
+        const cardView = document.getElementById('cardView');
+        const tableViewBtn = document.getElementById('tableViewBtn');
+        const cardViewBtn = document.getElementById('cardViewBtn');
+
+        if (viewType === 'table') {
+            tableView.style.display = 'block';
+            cardView.style.display = 'none';
+            tableViewBtn.classList.add('active');
+            cardViewBtn.classList.remove('active');
+        } else {
+            tableView.style.display = 'none';
+            cardView.style.display = 'block';
+            tableViewBtn.classList.remove('active');
+            cardViewBtn.classList.add('active');
+        }
+    }
+
+    // 更新项目甘特图
+    function updateProjectGantt(projects) {
+        const container = document.getElementById('projectGanttContainer');
+        container.innerHTML = '<h3>📊 项目进度甘特图</h3>';
+
+        projects.forEach(p => {
+            const item = document.createElement('div');
+            item.className = 'project-item';
+
+            const title = document.createElement('div');
+            title.textContent = p.name;
+            title.style.marginBottom = '5px';
+            title.style.fontWeight = 'bold';
+            item.appendChild(title);
+
+            const progressBar = document.createElement('div');
+            progressBar.style.width = '100%';
+            progressBar.style.background = '#eee';
+            progressBar.style.borderRadius = '3px';
+            progressBar.style.height = '20px';
+            progressBar.style.position = 'relative';
+
+            const bar = document.createElement('div');
+            bar.className = 'gantt-bar';
+            bar.style.width = `${p.progress}%`;
+            bar.style.height = '100%';
+            bar.style.background = p.progress > 70 ? '#2ecc71' :
+                p.progress > 30 ? '#3498db' : '#e74c3c';
+            bar.style.borderRadius = '3px';
+
+            const percentText = document.createElement('div');
+            percentText.style.position = 'absolute';
+            percentText.style.top = '0';
+            percentText.style.left = '0';
+            percentText.style.width = '100%';
+            percentText.style.textAlign = 'center';
+            percentText.style.color = p.progress > 50 ? 'white' : 'black';
+            percentText.style.lineHeight = '20px';
+            percentText.textContent = `${p.progress}%`;
+
+            progressBar.appendChild(bar);
+            progressBar.appendChild(percentText);
+            item.appendChild(progressBar);
+
+            const info = document.createElement('div');
+            info.style.marginTop = '5px';
+            info.style.fontSize = '14px';
+            info.textContent = `负责人: ${p.manager}`;
+            item.appendChild(info);
+
+            container.appendChild(item);
+        });
+    }
+
+    // 添加任务行
+    function addTaskRow() {
+        const mainTask = document.getElementById('mainTask').value;
+        const taskDesc = document.getElementById('taskDesc').value;
+
+        if (!mainTask || !taskDesc) {
+            alert("请填写完整的任务信息！");
+            return;
+        }
+
+        const tbody = document.querySelector('#taskTableBody');
+        const newRow = document.createElement('tr');
+        newRow.innerHTML = `
+                <td>${mainTask}: ${taskDesc}</td>
+                <td>
+                    <select class="task-input">
+                        <option>未开始</option>
+                        <option selected>进行中</option>
+                        <option>已完成</option>
+                        <option>已阻塞</option>
+                    </select>
+                </td>
+                <td><button class="danger" onclick="this.parentNode.parentNode.remove()">删除</button></td>
+            `;
+        tbody.appendChild(newRow);
+        document.getElementById('taskDesc').value = '';
+    }
+
+    // 提交每日任务
+    function submitDailyForm(data) {
+        const date = document.getElementById('taskDate').value;
+        const staffId = parseInt(document.getElementById('staff').value);
+        const projectId = parseInt(document.getElementById('project').value);
+
+        if(!staffId || !projectId) {
+            alert('请选择姓名和项目');
+            return;
+        }
+
+        const taskRows = document.querySelectorAll('#taskTableBody tr');
+        if(taskRows.length === 0) {
+            alert('请至少添加一个任务');
+            return;
+        }
+
+        const newTasks = Array.from(taskRows).map(row => ({
+            mainTask: row.cells[0].textContent.split(':')[0].trim(),
+            description: row.cells[0].textContent.split(':')[1].trim(),
+            status: row.cells[1].querySelector('select').value
+        }));
+
+        // 创建新任务对象
+        const newTask = {
+            id: Date.now(),
+            date,
+            staff: staffId,
+            project: projectId,
+            tasks: newTasks
+        };
+
+        data.tasks.push(newTask);
+
+        // 更新项目进度
+        const project = data.projects.find(p => p.id === projectId);
+        if (project) {
+            const completedTasks = newTasks.filter(t => t.status === '已完成').length;
+            project.progress = Math.min(100, project.progress + (completedTasks * 5));
+        }
+
+        saveSystemData(data);
+        alert('任务提交成功！');
+        document.querySelector('#taskTableBody').innerHTML = '';
+        updateTeamTasksTable(data.tasks);
+        updateProjectGantt(data.projects);
+        initChart(data.projects);
+    }
+
+    // 添加项目
+    function addProject() {
+        const name = document.getElementById('newProjectName').value.trim();
+        const manager = document.getElementById('newProjectManager').value.trim();
+
+        if(!name || !manager) {
+            alert('请填写项目名称和负责人');
+            return;
+        }
+
+        const data = getSystemData();
+        const newProject = {
+            id: Date.now(),
+            name,
+            manager,
+            progress: 0
+        };
+
+        data.projects.push(newProject);
+        saveSystemData(data);
+
+        document.getElementById('newProjectName').value = '';
+        document.getElementById('newProjectManager').value = '';
+        updateProjectList(data.projects);
+        updateProjectSelect(data.projects);
+        updateProjectGantt(data.projects);
+        initChart(data.projects);
+    }
+
+    // 删除项目
+    function deleteProject(projectId) {
+        if(!confirm('确定要删除这个项目吗？')) return;
+
+        const data = getSystemData();
+        data.projects = data.projects.filter(p => p.id !== projectId);
+        saveSystemData(data);
+
+        updateProjectList(data.projects);
+        updateProjectSelect(data.projects);
+        updateProjectGantt(data.projects);
+        initChart(data.projects);
+    }
+
+    // 添加成员
+    function addStaff() {
+        const name = document.getElementById('newStaffName').value.trim();
+        if(!name) {
+            alert('请输入姓名');
+            return;
+        }
+
+        const data = getSystemData();
+        if(data.staff.some(s => s.name === name)) {
+            alert('该成员已存在');
+            return;
+        }
+
+        const newStaff = {
+            id: Date.now(),
+            name,
+            projects: []
+        };
+
+        data.staff.push(newStaff);
+        saveSystemData(data);
+
+        document.getElementById('newStaffName').value = '';
+        updateStaffList(data.staff, data.projects);
+        updateStaffSelect(data.staff);
+    }
+
+    // 删除成员
+    function deleteStaff(staffId) {
+        if(!confirm('确定要删除这个成员吗？')) return;
+
+        const data = getSystemData();
+
+        // 找到被删成员，保护管理员账号
+        const target = (data.staff || []).find(s => s.id === staffId);
+        if (target && target.name === '管理员') {
+            alert('不能删除管理员账号');
+            return;
+        }
+
+        // 从成员列表移除
+        data.staff = (data.staff || []).filter(s => s.id !== staffId);
+        saveSystemData(data);
+
+        // 同步从用户表中移除对应账号，防止继续登录
+        const users = JSON.parse(localStorage.getItem(USERS_KEY) || '{}');
+        if (target && users[target.name]) {
+            delete users[target.name];
+            localStorage.setItem(USERS_KEY, JSON.stringify(users));
+        }
+
+        updateStaffList(data.staff, data.projects);
+        updateStaffSelect(data.staff);
+    }
+
+    // 退出登录
+    function logout() {
+        currentUser = null;
+        document.getElementById('mainSystem').style.display = 'none';
+        document.getElementById('loginContainer').style.display = 'flex';
+        document.getElementById('username').value = '';
+        document.getElementById('password').value = '';
+        document.getElementById('loginError').textContent = '';
+    }
+
+    // 导出数据到文件
+    function exportData() {
+        const rawUsers = JSON.parse(localStorage.getItem(USERS_KEY) || '{}');
+        const systemData = JSON.parse(localStorage.getItem(DATA_KEY) || '{}');
+        
+        // 从用户数据中移除密码字段
+        const users = {};
+        Object.keys(rawUsers).forEach(username => {
+            const { password, ...rest } = rawUsers[username] || {};
+            users[username] = rest;
+        });
+        
+        const exportData = {
+            users: users,
+            systemData: systemData,
+            exportDate: new Date().toISOString(),
+            version: '1.0'
+        };
+        
+        const dataStr = JSON.stringify(exportData, null, 2);
+        const dataBlob = new Blob([dataStr], {type: 'application/json'});
+        
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(dataBlob);
+        link.download = `BIM系统数据_${new Date().toISOString().split('T')[0]}.json`;
+        link.click();
+        
+        alert('数据导出成功！文件已下载到您的下载文件夹。');
+    }
+
+    // 导入数据
+    function importData() {
+        if (!confirm('导入数据将覆盖当前所有数据，确定要继续吗？')) {
+            return;
+        }
+        // 根据当前页面状态选择文件输入框
+        if (document.getElementById('mainSystem').style.display === 'block') {
+            document.getElementById('importFileMain').click();
+        } else {
+            document.getElementById('importFile').click();
+        }
+    }
+
+    // 处理文件导入
+    function handleFileImport(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const importData = JSON.parse(e.target.result);
+                
+                if (importData.users && importData.systemData) {
+                    localStorage.setItem(USERS_KEY, JSON.stringify(importData.users));
+                    localStorage.setItem(DATA_KEY, JSON.stringify(importData.systemData));
+                    
+                    alert('数据导入成功！页面将重新加载。');
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                } else {
+                    alert('文件格式错误，请选择正确的数据文件。');
+                }
+            } catch (error) {
+                alert('文件读取失败，请检查文件格式。');
+                console.error('Import error:', error);
+            }
+        };
+        reader.readAsText(file);
+        
+        // 清除文件选择，允许重复选择同一文件
+        event.target.value = '';
+    }
+
+    // 重置管理员账号
+    function resetAdminAccount() {
+        if (!confirm('确定要重置管理员账号吗？这将重新创建管理员账号。')) {
+            return;
+        }
+        
+        // 清除现有的用户数据
+        localStorage.removeItem(USERS_KEY);
+        
+        // 重新初始化用户数据
+        initUsersData();
+
+        // 推送云端
+        const users = JSON.parse(localStorage.getItem(USERS_KEY) || '{}');
+        cloudPush(USERS_KEY, users);
+        
+        // 设置默认的登录信息
+        document.getElementById('username').value = '管理员';
+        document.getElementById('password').value = '123456';
+        
+        alert('管理员账号已重置！\n用户名：管理员\n密码：123456');
+    }
+
+    // 显示管理员面板
+    function showAdminPanel() {
+        // 检查当前用户是否为管理员
+        if (!currentUser || currentUser.role !== 'admin') {
+            alert('⚠️ 权限不足！只有管理员才能访问此功能！');
+            return;
+        }
+        
+        const users = JSON.parse(localStorage.getItem(USERS_KEY) || '{}');
+        console.log('当前用户数据:', users);
+        
+        let userInfo = '🔐 管理员面板 - 用户数据\n\n';
+        Object.keys(users).forEach(username => {
+            const user = users[username];
+            const decryptedPassword = simpleDecrypt(user.password);
+            userInfo += `👤 用户信息:\n`;
+            userInfo += `   用户名: ${username}\n`;
+            userInfo += `   姓名: ${user.name}\n`;
+            userInfo += `   角色: ${user.role === 'admin' ? '管理员' : '普通成员'}\n`;
+            userInfo += `   密码: ${decryptedPassword}\n`;
+            userInfo += `\n`;
+        });
+        
+        userInfo += `📊 统计信息:\n`;
+        userInfo += `   总用户数: ${Object.keys(users).length}\n`;
+        userInfo += `   管理员数: ${Object.values(users).filter(u => u.role === 'admin').length}\n`;
+        userInfo += `   普通成员数: ${Object.values(users).filter(u => u.role === 'staff').length}\n`;
+        
+        alert(userInfo);
+    }
+</script>
+</body>
+</html>
