@@ -384,17 +384,12 @@
             <div id="projectGanttContainer"></div>
             <h3>📝 今日团队任务</h3>
             
-            <!-- 视图切换按钮 -->
-            <div class="view-toggle">
-                <button id="tableViewBtn" class="active" onclick="switchView('table')">表格视图</button>
-                <button id="cardViewBtn" onclick="switchView('card')">卡片视图</button>
-                <button onclick="viewAllTasks()" style="background: #9b59b6;">查看所有任务</button>
-                <button onclick="forceDeleteTask('1756261185209')" style="background: #e67e22;">删除问题任务</button>
-                <button onclick="fixTaskIdIssue()" style="background: #16a085;">修复ID问题</button>
-                                 <button onclick="clearAllTasks()" style="background: #e74c3c;">清空所有任务</button>
-                 <button onclick="fixStaffNameIssue()" style="background: #8e44ad;">修复姓名显示</button>
-                 <button onclick="debugTaskTable()" style="background: #f39c12;">调试任务表格</button>
-            </div>
+                                      <!-- 视图切换按钮 -->
+              <div class="view-toggle">
+                  <button id="tableViewBtn" class="active" onclick="switchView('table')">表格视图</button>
+                  <button id="cardViewBtn" onclick="switchView('card')">卡片视图</button>
+                  <button id="clearAllTasksBtn" onclick="clearAllTasks()" style="background: #e74c3c; display: none;">清空所有任务</button>
+              </div>
             
             <!-- 表格视图 -->
             <div id="tableView" class="team-tasks-table">
@@ -744,17 +739,24 @@
             el.style.display = 'block'; // 成员和管理员都能看到
         });
 
-        // 显示管理员操作列
-        document.getElementById('adminActionHeader').style.display = isAdmin ? 'table-cell' : 'none';
-        
-        // 显示管理员面板按钮
-        const adminPanelBtn = document.getElementById('adminPanelBtn');
-        if (adminPanelBtn) {
-            adminPanelBtn.style.display = isAdmin ? 'inline-block' : 'none';
-        }
-        // 云端配置按钮 - 已固定在代码中，隐藏按钮
-        const cloudCfgBtn = document.getElementById('cloudCfgBtn');
-        if (cloudCfgBtn) cloudCfgBtn.style.display = 'none';
+                 // 显示管理员操作列
+         document.getElementById('adminActionHeader').style.display = isAdmin ? 'table-cell' : 'none';
+         
+         // 显示管理员面板按钮
+         const adminPanelBtn = document.getElementById('adminPanelBtn');
+         if (adminPanelBtn) {
+             adminPanelBtn.style.display = isAdmin ? 'inline-block' : 'none';
+         }
+         
+         // 显示清空所有任务按钮（仅管理员）
+         const clearAllTasksBtn = document.getElementById('clearAllTasksBtn');
+         if (clearAllTasksBtn) {
+             clearAllTasksBtn.style.display = isAdmin ? 'inline-block' : 'none';
+         }
+         
+         // 云端配置按钮 - 已固定在代码中，隐藏按钮
+         const cloudCfgBtn = document.getElementById('cloudCfgBtn');
+         if (cloudCfgBtn) cloudCfgBtn.style.display = 'none';
 
         initMainSystem();
     }
@@ -1189,211 +1191,66 @@
         updateTeamTasksTable(getSystemData().tasks);
     }
 
-    // 删除任务
-    function deleteTask(taskId) {
-        if (!confirm('确定要删除这个任务吗？')) return;
+         // 删除任务
+     function deleteTask(taskId) {
+         if (!confirm('确定要删除这个任务吗？')) return;
+ 
+         const [taskIndex, subTaskIndex] = taskId.split('-').map(Number);
+         const data = getSystemData();
+         const task = data.tasks.find(t => t.id === taskIndex);
+ 
+         if (!task) return;
+ 
+         // 删除子任务
+         task.tasks.splice(subTaskIndex, 1);
+ 
+         // 如果没有子任务了，删除整个任务
+         if (task.tasks.length === 0) {
+             data.tasks = data.tasks.filter(t => t.id !== taskIndex);
+         }
+ 
+         saveSystemData(data);
+         cloudPush(DATA_KEY, data);
+         updateTeamTasksTable(data.tasks);
+         updateProjectGantt(data.projects);
+         initChart(data.projects);
+         alert('任务删除成功！');
+     }
+ 
+     // 清空所有任务（仅管理员）
+     function clearAllTasks() {
+         // 检查当前用户是否为管理员
+         if (!currentUser || currentUser.role !== 'admin') {
+             alert('⚠️ 权限不足！只有管理员才能清空所有任务！');
+             return;
+         }
+         
+         if (!confirm('⚠️ 警告：此操作将删除所有任务数据，且无法恢复！\n\n确定要清空所有任务吗？')) {
+             return;
+         }
+         
+         const data = getSystemData();
+         
+         // 清空所有任务
+         data.tasks = [];
+         
+         // 重置所有项目进度为0
+         data.projects.forEach(project => {
+             project.progress = 0;
+         });
+         
+         saveSystemData(data);
+         cloudPush(DATA_KEY, data);
+         
+         // 刷新界面
+         updateTeamTasksTable(data.tasks);
+         updateProjectGantt(data.projects);
+         initChart(data.projects);
+         
+         alert('✅ 所有任务已清空！项目进度已重置为0%。');
+     }
 
-        const [taskIndex, subTaskIndex] = taskId.split('-').map(Number);
-        const data = getSystemData();
-        const task = data.tasks.find(t => t.id === taskIndex);
 
-        if (!task) return;
-
-        // 删除子任务
-        task.tasks.splice(subTaskIndex, 1);
-
-        // 如果没有子任务了，删除整个任务
-        if (task.tasks.length === 0) {
-            data.tasks = data.tasks.filter(t => t.id !== taskIndex);
-        }
-
-        saveSystemData(data);
-        cloudPush(DATA_KEY, data);
-        updateTeamTasksTable(data.tasks);
-        updateProjectGantt(data.projects);
-        initChart(data.projects);
-        alert('任务删除成功！');
-    }
-
-    // 强制删除特定任务（用于调试）
-    function forceDeleteTask(taskId) {
-        if (!confirm(`确定要强制删除任务ID为 ${taskId} 的任务吗？`)) return;
-        
-        const data = getSystemData();
-        console.log('删除前的任务数据:', data.tasks);
-        
-        // 检查任务是否存在
-        const taskExists = data.tasks.some(t => t.id === parseInt(taskId));
-        if (!taskExists) {
-            alert(`任务ID ${taskId} 不存在！`);
-            return;
-        }
-        
-        // 直接通过ID删除任务
-        data.tasks = data.tasks.filter(t => t.id !== parseInt(taskId));
-        
-        console.log('删除后的任务数据:', data.tasks);
-        saveSystemData(data);
-        cloudPush(DATA_KEY, data);
-        
-        // 刷新界面
-        updateTeamTasksTable(data.tasks);
-        updateProjectGantt(data.projects);
-        initChart(data.projects);
-        
-        alert(`任务ID ${taskId} 已强制删除！`);
-        
-        // 强制刷新页面以确保数据更新
-        setTimeout(() => {
-            location.reload();
-        }, 1000);
-    }
-
-    // 查看所有任务（用于调试）
-    function viewAllTasks() {
-        const data = getSystemData();
-        console.log('所有任务数据:', data.tasks);
-        
-        let taskInfo = '当前所有任务:\n';
-        data.tasks.forEach(task => {
-            taskInfo += `任务ID: ${task.id}, 日期: ${task.date}, 员工ID: ${task.staff}\n`;
-            task.tasks.forEach((subTask, index) => {
-                taskInfo += `  - 子任务${index}: ${subTask.mainTask} - ${subTask.description} (${subTask.status})\n`;
-            });
-        });
-        
-        alert(taskInfo);
-    }
-
-    // 清空所有任务（紧急清理功能）
-    function clearAllTasks() {
-        if (!confirm('⚠️ 警告：这将删除所有任务数据！确定要继续吗？')) return;
-        
-        const data = getSystemData();
-        data.tasks = [];
-        saveSystemData(data);
-        cloudPush(DATA_KEY, data);
-        
-        // 刷新界面
-        updateTeamTasksTable(data.tasks);
-        updateProjectGantt(data.projects);
-        initChart(data.projects);
-        
-        alert('所有任务已清空！');
-        
-        // 强制刷新页面
-        setTimeout(() => {
-            location.reload();
-        }, 1000);
-    }
-
-    // 修复任务ID问题（处理字符串和数字类型不匹配）
-    function fixTaskIdIssue() {
-        const data = getSystemData();
-        console.log('修复前的任务数据:', data.tasks);
-        
-        // 确保所有任务ID都是数字类型
-        data.tasks.forEach(task => {
-            if (typeof task.id === 'string') {
-                task.id = parseInt(task.id);
-            }
-        });
-        
-        // 删除特定的问题任务（尝试多种方式）
-        const targetId = 1756261185209;
-        data.tasks = data.tasks.filter(t => {
-            const taskId = typeof t.id === 'string' ? parseInt(t.id) : t.id;
-            return taskId !== targetId;
-        });
-        
-        console.log('修复后的任务数据:', data.tasks);
-        saveSystemData(data);
-        
-        // 刷新界面
-        updateTeamTasksTable(data.tasks);
-        updateProjectGantt(data.projects);
-        initChart(data.projects);
-        
-        alert('任务ID问题已修复，问题任务已删除！');
-        
-        // 强制刷新页面
-        setTimeout(() => {
-            location.reload();
-        }, 1000);
-    }
-    
-    // 修复成员姓名显示问题
-    function fixStaffNameIssue() {
-        const data = getSystemData();
-        const users = JSON.parse(localStorage.getItem(USERS_KEY) || '{}');
-        
-        console.log('修复前的任务数据:', data.tasks);
-        console.log('用户数据:', users);
-        
-        // 遍历所有任务，修复成员姓名显示
-        data.tasks.forEach(task => {
-            // 尝试通过用户数据找到对应的成员姓名
-            const user = Object.values(users).find(u => u.id === task.staff);
-            if (user) {
-                // 确保成员列表中也有这个用户
-                const existingStaff = data.staff.find(s => s.id === user.id);
-                if (!existingStaff) {
-                    data.staff.push({
-                        id: user.id,
-                        name: user.name,
-                        projects: []
-                    });
-                }
-            }
-        });
-        
-        console.log('修复后的任务数据:', data.tasks);
-        saveSystemData(data);
-        
-        // 刷新界面
-        updateTeamTasksTable(data.tasks);
-        updateProjectGantt(data.projects);
-        initChart(data.projects);
-        
-        alert('成员姓名显示问题已修复！');
-        
-        // 强制刷新页面
-        setTimeout(() => {
-            location.reload();
-        }, 1000);
-    }
-    
-    // 调试任务表格
-    function debugTaskTable() {
-        const tbody = document.getElementById('taskTableBody');
-        console.log('=== 任务表格调试信息 ===');
-        console.log('tbody元素:', tbody);
-        console.log('tbody.innerHTML:', tbody.innerHTML);
-        console.log('tbody.children.length:', tbody.children.length);
-        console.log('tbody.querySelectorAll("tr").length:', tbody.querySelectorAll('tr').length);
-        
-        // 尝试不同的选择器
-        const selectors = [
-            '#taskTableBody tr',
-            'table#taskTable tbody tr',
-            '.task-input',
-            'select.task-input'
-        ];
-        
-        selectors.forEach(selector => {
-            const elements = document.querySelectorAll(selector);
-            console.log(`选择器 "${selector}" 找到 ${elements.length} 个元素`);
-        });
-        
-        // 显示调试信息
-        let debugInfo = '=== 任务表格调试信息 ===\n';
-        debugInfo += `tbody元素存在: ${tbody ? '是' : '否'}\n`;
-        debugInfo += `tbody.innerHTML长度: ${tbody ? tbody.innerHTML.length : 0}\n`;
-        debugInfo += `tbody子元素数量: ${tbody ? tbody.children.length : 0}\n`;
-        debugInfo += `tr元素数量: ${tbody ? tbody.querySelectorAll('tr').length : 0}\n`;
-        
-        alert(debugInfo);
-    }
 
     // 视图切换功能
     function switchView(viewType) {
@@ -1480,7 +1337,6 @@
         }
 
         const tbody = document.querySelector('#taskTableBody');
-        console.log('添加任务行 - tbody元素:', tbody);
         
         const newRow = document.createElement('tr');
         newRow.innerHTML = `
@@ -1496,8 +1352,6 @@
                 <td><button class="danger" onclick="this.parentNode.parentNode.remove()">删除</button></td>
             `;
         tbody.appendChild(newRow);
-        console.log('添加任务行后 - 表格内容:', tbody.innerHTML);
-        console.log('当前任务行数量:', tbody.querySelectorAll('tr').length);
         
         document.getElementById('taskDesc').value = '';
     }
@@ -1520,26 +1374,7 @@
             return;
         }
 
-        // 尝试多种方式查找任务行
-        let taskRows = document.querySelectorAll('#taskTableBody tr');
-        console.log('方式1 - 找到的任务行数量:', taskRows.length);
-        
-        if(taskRows.length === 0) {
-            // 尝试其他选择器
-            taskRows = document.querySelectorAll('table#taskTable tbody tr');
-            console.log('方式2 - 找到的任务行数量:', taskRows.length);
-        }
-        
-        if(taskRows.length === 0) {
-            // 尝试更宽泛的选择器
-            taskRows = document.querySelectorAll('.task-input').length > 0 ? 
-                document.querySelectorAll('.task-input')[0].closest('tr') ? 
-                [document.querySelectorAll('.task-input')[0].closest('tr')] : [] : [];
-            console.log('方式3 - 找到的任务行数量:', taskRows.length);
-        }
-        
-        console.log('最终找到的任务行数量:', taskRows.length);
-        console.log('任务表格内容:', document.getElementById('taskTableBody').innerHTML);
+        const taskRows = document.querySelectorAll('#taskTableBody tr');
         
         if(taskRows.length === 0) {
             alert('请至少添加一个任务');
