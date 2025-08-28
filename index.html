@@ -1700,33 +1700,46 @@
         initChart(data.projects);
     }
 
-    // 添加成员
-    function addStaff() {
-        const name = document.getElementById('newStaffName').value.trim();
-        if(!name) {
-            alert('请输入姓名');
-            return;
-        }
-
-        const data = getSystemData();
-        if(data.staff.some(s => s.name === name)) {
-            alert('该成员已存在');
-            return;
-        }
-
-        const newStaff = {
-            id: Date.now(),
-            name,
-            projects: []
-        };
-
-        data.staff.push(newStaff);
-        saveSystemData(data);
-
-        document.getElementById('newStaffName').value = '';
-        updateStaffList(data.staff, data.projects);
-        updateStaffSelect(data.staff);
-    }
+         // 添加成员
+     function addStaff() {
+         const name = document.getElementById('newStaffName').value.trim();
+         if(!name) {
+             alert('请输入姓名');
+             return;
+         }
+ 
+         const data = getSystemData();
+         if(data.staff.some(s => s.name === name)) {
+             alert('该成员已存在');
+             return;
+         }
+ 
+         const newStaff = {
+             id: Date.now(),
+             name,
+             projects: []
+         };
+ 
+         data.staff.push(newStaff);
+         saveSystemData(data);
+ 
+         // 同时创建对应的用户账号
+         const users = JSON.parse(localStorage.getItem(USERS_KEY) || '{}');
+         users[name] = {
+             id: newStaff.id,
+             name: name,
+             password: simpleEncrypt('123'), // 默认密码
+             role: 'staff'
+         };
+         localStorage.setItem(USERS_KEY, JSON.stringify(users));
+         cloudPush(USERS_KEY, users);
+ 
+         document.getElementById('newStaffName').value = '';
+         updateStaffList(data.staff, data.projects);
+         updateStaffSelect(data.staff);
+         
+         alert(`成员"${name}"添加成功！\n默认密码：123\n请告知该成员使用真实姓名和密码123登录`);
+     }
 
     // 删除成员
     function deleteStaff(staffId) {
@@ -1873,9 +1886,13 @@
         }
         
         const users = JSON.parse(localStorage.getItem(USERS_KEY) || '{}');
+        const data = getSystemData();
         console.log('当前用户数据:', users);
+        console.log('当前系统数据:', data);
         
         let userInfo = '🔐 管理员面板 - 用户数据\n\n';
+        
+        // 显示所有用户账号
         Object.keys(users).forEach(username => {
             const user = users[username];
             const decryptedPassword = simpleDecrypt(user.password);
@@ -1887,10 +1904,25 @@
             userInfo += `\n`;
         });
         
+        // 检查是否有成员没有对应的用户账号
+        if (data && data.staff && data.staff.length > 0) {
+            userInfo += `📋 成员列表检查:\n`;
+            data.staff.forEach(staff => {
+                const userExists = Object.values(users).some(u => u.id === staff.id);
+                if (!userExists) {
+                    userInfo += `⚠️  成员"${staff.name}"没有对应的用户账号\n`;
+                } else {
+                    userInfo += `✅  成员"${staff.name}"有对应的用户账号\n`;
+                }
+            });
+            userInfo += `\n`;
+        }
+        
         userInfo += `📊 统计信息:\n`;
         userInfo += `   总用户数: ${Object.keys(users).length}\n`;
         userInfo += `   管理员数: ${Object.values(users).filter(u => u.role === 'admin').length}\n`;
         userInfo += `   普通成员数: ${Object.values(users).filter(u => u.role === 'staff').length}\n`;
+        userInfo += `   系统成员数: ${data && data.staff ? data.staff.length : 0}\n`;
         
         alert(userInfo);
     }
