@@ -389,6 +389,7 @@
                   <button id="tableViewBtn" class="active" onclick="switchView('table')">表格视图</button>
                   <button id="cardViewBtn" onclick="switchView('card')">卡片视图</button>
                   <button id="clearAllTasksBtn" onclick="clearAllTasks()" style="background: #e74c3c; display: none;">清空所有任务</button>
+                  <button id="debugTasksBtn" onclick="debugTasks()" style="background: #9b59b6; display: none;">调试任务</button>
               </div>
             
             <!-- 表格视图 -->
@@ -754,6 +755,12 @@
              clearAllTasksBtn.style.display = isAdmin ? 'inline-block' : 'none';
          }
          
+         // 显示调试任务按钮（仅管理员）
+         const debugTasksBtn = document.getElementById('debugTasksBtn');
+         if (debugTasksBtn) {
+             debugTasksBtn.style.display = isAdmin ? 'inline-block' : 'none';
+         }
+         
          // 云端配置按钮 - 已固定在代码中，隐藏按钮
          const cloudCfgBtn = document.getElementById('cloudCfgBtn');
          if (cloudCfgBtn) cloudCfgBtn.style.display = 'none';
@@ -1055,135 +1062,183 @@
         }
     }
 
-    // 编辑任务
-    function editTask(taskId) {
-        if (editingTaskId) {
-            alert('请先完成当前编辑任务');
-            return;
-        }
+         // 编辑任务
+     function editTask(taskId) {
+         if (editingTaskId) {
+             alert('请先完成当前编辑任务');
+             return;
+         }
+ 
+         editingTaskId = taskId;
+         const [taskIndex, subTaskIndex] = taskId.split('-').map(Number);
+         const data = getSystemData();
+         const task = data.tasks.find(t => t.id === taskIndex);
+ 
+         if (!task) {
+             alert('找不到对应的任务！');
+             return;
+         }
+ 
+         if (!task.tasks || !task.tasks[subTaskIndex]) {
+             alert('任务数据结构错误！');
+             return;
+         }
+ 
+         const subTask = task.tasks[subTaskIndex];
+         console.log('编辑任务:', { taskId, taskIndex, subTaskIndex, subTask });
+         
+         // 查找表格中的行
+         const tableRow = document.querySelector(`#teamTasksBody tr:has(button[onclick="editTask('${taskId}')"])`);
+         if (tableRow) {
+             tableRow.classList.add('edit-mode');
+             tableRow.innerHTML = `
+                     <td class="name-cell">
+                         <select id="editStaff-${taskId}">
+                             ${data.staff.map(s => `<option value="${s.id}" ${s.id === task.staff ? 'selected' : ''}>${s.name}</option>`).join('')}
+                         </select>
+                     </td>
+                     <td class="project-cell">
+                         <select id="editProject-${taskId}">
+                             ${data.projects.map(p => `<option value="${p.id}" ${p.id === task.project ? 'selected' : ''}>${p.name}</option>`).join('')}
+                         </select>
+                     </td>
+                     <td class="task-content">
+                         <input type="text" id="editTaskDesc-${taskId}" value="${subTask.mainTask}: ${subTask.description}">
+                     </td>
+                     <td class="status-cell">
+                         <select id="editStatus-${taskId}">
+                             <option value="未开始" ${subTask.status === '未开始' ? 'selected' : ''}>未开始</option>
+                             <option value="进行中" ${subTask.status === '进行中' ? 'selected' : ''}>进行中</option>
+                             <option value="已完成" ${subTask.status === '已完成' ? 'selected' : ''}>已完成</option>
+                             <option value="已阻塞" ${subTask.status === '已阻塞' ? 'selected' : ''}>已阻塞</option>
+                         </select>
+                     </td>
+                     <td class="action-cell edit-buttons">
+                         <button class="success" onclick="saveTask('${taskId}')">保存</button>
+                         <button class="danger" onclick="cancelEdit('${taskId}')">取消</button>
+                     </td>
+                 `;
+         }
+ 
+         // 同时更新卡片视图中的对应卡片
+         const cardElement = document.querySelector(`#teamTasksCards .task-card:has(button[onclick="editTask('${taskId}')"])`);
+         if (cardElement) {
+             cardElement.innerHTML = `
+                 <div class="task-card-header">
+                     <div class="task-card-title">编辑任务</div>
+                 </div>
+                 <div style="margin-bottom: 10px;">
+                     <select id="editStaffCard-${taskId}" style="width: 100%; margin-bottom: 5px;">
+                         ${data.staff.map(s => `<option value="${s.id}" ${s.id === task.staff ? 'selected' : ''}>${s.name}</option>`).join('')}
+                     </select>
+                     <select id="editProjectCard-${taskId}" style="width: 100%; margin-bottom: 5px;">
+                         ${data.projects.map(p => `<option value="${p.id}" ${p.id === task.project ? 'selected' : ''}>${p.name}</option>`).join('')}
+                     </select>
+                     <input type="text" id="editTaskDescCard-${taskId}" value="${subTask.mainTask}: ${subTask.description}" style="width: 100%; margin-bottom: 5px;">
+                     <select id="editStatusCard-${taskId}" style="width: 100%; margin-bottom: 5px;">
+                         <option value="未开始" ${subTask.status === '未开始' ? 'selected' : ''}>未开始</option>
+                         <option value="进行中" ${subTask.status === '进行中' ? 'selected' : ''}>进行中</option>
+                         <option value="已完成" ${subTask.status === '已完成' ? 'selected' : ''}>已完成</option>
+                         <option value="已阻塞" ${subTask.status === '已阻塞' ? 'selected' : ''}>已阻塞</option>
+                     </select>
+                 </div>
+                 <div class="task-card-actions">
+                     <button class="success" onclick="saveTask('${taskId}')">保存</button>
+                     <button class="danger" onclick="cancelEdit('${taskId}')">取消</button>
+                 </div>
+             `;
+         }
+         
+         console.log('编辑界面已创建，当前状态:', subTask.status);
+     }
 
-        editingTaskId = taskId;
-        const [taskIndex, subTaskIndex] = taskId.split('-').map(Number);
-        const data = getSystemData();
-        const task = data.tasks.find(t => t.id === taskIndex);
-
-        if (!task) return;
-
-        const subTask = task.tasks[subTaskIndex];
-        
-        // 查找表格中的行
-        const tableRow = document.querySelector(`#teamTasksBody tr:has(button[onclick="editTask('${taskId}')"])`);
-        if (tableRow) {
-            tableRow.classList.add('edit-mode');
-            tableRow.innerHTML = `
-                    <td class="name-cell">
-                        <select id="editStaff-${taskId}">
-                            ${data.staff.map(s => `<option value="${s.id}" ${s.id === task.staff ? 'selected' : ''}>${s.name}</option>`).join('')}
-                        </select>
-                    </td>
-                    <td class="project-cell">
-                        <select id="editProject-${taskId}">
-                            ${data.projects.map(p => `<option value="${p.id}" ${p.id === task.project ? 'selected' : ''}>${p.name}</option>`).join('')}
-                        </select>
-                    </td>
-                    <td class="task-content">
-                        <input type="text" id="editTaskDesc-${taskId}" value="${subTask.mainTask}: ${subTask.description}">
-                    </td>
-                    <td class="status-cell">
-                        <select id="editStatus-${taskId}">
-                            <option value="未开始" ${subTask.status === '未开始' ? 'selected' : ''}>未开始</option>
-                            <option value="进行中" ${subTask.status === '进行中' ? 'selected' : ''}>进行中</option>
-                            <option value="已完成" ${subTask.status === '已完成' ? 'selected' : ''}>已完成</option>
-                            <option value="已阻塞" ${subTask.status === '已阻塞' ? 'selected' : ''}>已阻塞</option>
-                        </select>
-                    </td>
-                    <td class="action-cell edit-buttons">
-                        <button class="success" onclick="saveTask('${taskId}')">保存</button>
-                        <button class="danger" onclick="cancelEdit('${taskId}')">取消</button>
-                    </td>
-                `;
-        }
-
-        // 同时更新卡片视图中的对应卡片
-        const cardElement = document.querySelector(`#teamTasksCards .task-card:has(button[onclick="editTask('${taskId}')"])`);
-        if (cardElement) {
-            cardElement.innerHTML = `
-                <div class="task-card-header">
-                    <div class="task-card-title">编辑任务</div>
-                </div>
-                <div style="margin-bottom: 10px;">
-                    <select id="editStaffCard-${taskId}" style="width: 100%; margin-bottom: 5px;">
-                        ${data.staff.map(s => `<option value="${s.id}" ${s.id === task.staff ? 'selected' : ''}>${s.name}</option>`).join('')}
-                    </select>
-                    <select id="editProjectCard-${taskId}" style="width: 100%; margin-bottom: 5px;">
-                        ${data.projects.map(p => `<option value="${p.id}" ${p.id === task.project ? 'selected' : ''}>${p.name}</option>`).join('')}
-                    </select>
-                    <input type="text" id="editTaskDescCard-${taskId}" value="${subTask.mainTask}: ${subTask.description}" style="width: 100%; margin-bottom: 5px;">
-                    <select id="editStatusCard-${taskId}" style="width: 100%; margin-bottom: 5px;">
-                        <option value="未开始" ${subTask.status === '未开始' ? 'selected' : ''}>未开始</option>
-                        <option value="进行中" ${subTask.status === '进行中' ? 'selected' : ''}>进行中</option>
-                        <option value="已完成" ${subTask.status === '已完成' ? 'selected' : ''}>已完成</option>
-                        <option value="已阻塞" ${subTask.status === '已阻塞' ? 'selected' : ''}>已阻塞</option>
-                    </select>
-                </div>
-                <div class="task-card-actions">
-                    <button class="success" onclick="saveTask('${taskId}')">保存</button>
-                    <button class="danger" onclick="cancelEdit('${taskId}')">取消</button>
-                </div>
-            `;
-        }
-    }
-
-    // 保存任务编辑
-    function saveTask(taskId) {
-        const [taskIndex, subTaskIndex] = taskId.split('-').map(Number);
-        const data = getSystemData();
-        const task = data.tasks.find(t => t.id === taskIndex);
-
-        if (!task) return;
-
-        // 尝试从表格视图获取数据
-        let staffId, projectId, taskDesc, status;
-        
-        const staffElement = document.getElementById(`editStaff-${taskId}`);
-        const projectElement = document.getElementById(`editProject-${taskId}`);
-        const taskDescElement = document.getElementById(`editTaskDesc-${taskId}`);
-        const statusElement = document.getElementById(`editStatus-${taskId}`);
-
-        // 如果表格视图的元素存在，使用表格视图的数据
-        if (staffElement && projectElement && taskDescElement && statusElement) {
-            staffId = parseInt(staffElement.value);
-            projectId = parseInt(projectElement.value);
-            taskDesc = taskDescElement.value;
-            status = statusElement.value;
-        } else {
-            // 否则使用卡片视图的数据
-            staffId = parseInt(document.getElementById(`editStaffCard-${taskId}`).value);
-            projectId = parseInt(document.getElementById(`editProjectCard-${taskId}`).value);
-            taskDesc = document.getElementById(`editTaskDescCard-${taskId}`).value;
-            status = document.getElementById(`editStatusCard-${taskId}`).value;
-        }
-
-        // 更新任务信息
-        task.staff = staffId;
-        task.project = projectId;
-
-        const [mainTask, description] = taskDesc.split(':');
-        task.tasks[subTaskIndex].mainTask = mainTask.trim();
-        task.tasks[subTaskIndex].description = description ? description.trim() : '';
-        task.tasks[subTaskIndex].status = status;
-
-        saveSystemData(data);
-        cloudPush(DATA_KEY, data);
-        editingTaskId = null;
-
-        // 刷新界面
-        updateTeamTasksTable(data.tasks);
-        updateProjectGantt(data.projects);
-        initChart(data.projects);
-
-        alert('任务更新成功！');
-    }
+         // 保存任务编辑
+     function saveTask(taskId) {
+         const [taskIndex, subTaskIndex] = taskId.split('-').map(Number);
+         const data = getSystemData();
+         const task = data.tasks.find(t => t.id === taskIndex);
+ 
+         if (!task) {
+             alert('找不到对应的任务！');
+             return;
+         }
+ 
+         if (!task.tasks || !task.tasks[subTaskIndex]) {
+             alert('任务数据结构错误！');
+             return;
+         }
+ 
+         // 尝试从表格视图获取数据
+         let staffId, projectId, taskDesc, status;
+         
+         const staffElement = document.getElementById(`editStaff-${taskId}`);
+         const projectElement = document.getElementById(`editProject-${taskId}`);
+         const taskDescElement = document.getElementById(`editTaskDesc-${taskId}`);
+         const statusElement = document.getElementById(`editStatus-${taskId}`);
+ 
+         // 如果表格视图的元素存在，使用表格视图的数据
+         if (staffElement && projectElement && taskDescElement && statusElement) {
+             staffId = parseInt(staffElement.value);
+             projectId = parseInt(projectElement.value);
+             taskDesc = taskDescElement.value;
+             status = statusElement.value;
+         } else {
+             // 否则使用卡片视图的数据
+             const staffCardElement = document.getElementById(`editStaffCard-${taskId}`);
+             const projectCardElement = document.getElementById(`editProjectCard-${taskId}`);
+             const taskDescCardElement = document.getElementById(`editTaskDescCard-${taskId}`);
+             const statusCardElement = document.getElementById(`editStatusCard-${taskId}`);
+             
+             if (staffCardElement && projectCardElement && taskDescCardElement && statusCardElement) {
+                 staffId = parseInt(staffCardElement.value);
+                 projectId = parseInt(projectCardElement.value);
+                 taskDesc = taskDescCardElement.value;
+                 status = statusCardElement.value;
+             } else {
+                 alert('无法获取编辑数据，请重试！');
+                 return;
+             }
+         }
+ 
+         // 验证数据
+         if (!staffId || !projectId || !taskDesc || !status) {
+             alert('请填写完整的任务信息！');
+             return;
+         }
+ 
+         // 更新任务信息
+         task.staff = staffId;
+         task.project = projectId;
+ 
+         // 解析任务描述
+         const [mainTask, description] = taskDesc.split(':');
+         if (!mainTask || !description) {
+             alert('任务描述格式错误，请使用"任务类型: 具体描述"的格式！');
+             return;
+         }
+ 
+         // 更新子任务信息
+         task.tasks[subTaskIndex].mainTask = mainTask.trim();
+         task.tasks[subTaskIndex].description = description.trim();
+         task.tasks[subTaskIndex].status = status;
+ 
+         // 保存数据
+         saveSystemData(data);
+         cloudPush(DATA_KEY, data);
+         editingTaskId = null;
+ 
+         // 刷新界面
+         updateTeamTasksTable(data.tasks);
+         updateProjectGantt(data.projects);
+         initChart(data.projects);
+ 
+         alert('✅ 任务更新成功！');
+         
+         // 强制刷新页面以确保数据更新
+         setTimeout(() => {
+             location.reload();
+         }, 1000);
+     }
 
     // 取消编辑
     function cancelEdit(taskId) {
@@ -1248,6 +1303,51 @@
          initChart(data.projects);
          
          alert('✅ 所有任务已清空！项目进度已重置为0%。');
+     }
+ 
+     // 调试任务数据
+     function debugTasks() {
+         // 检查当前用户是否为管理员
+         if (!currentUser || currentUser.role !== 'admin') {
+             alert('⚠️ 权限不足！只有管理员才能调试任务！');
+             return;
+         }
+         
+         const data = getSystemData();
+         console.log('当前系统数据:', data);
+         
+         let debugInfo = '🔍 任务调试信息\n\n';
+         
+         if (data.tasks && data.tasks.length > 0) {
+             debugInfo += `📋 任务总数: ${data.tasks.length}\n\n`;
+             
+             data.tasks.forEach((task, index) => {
+                 debugInfo += `任务 ${index + 1}:\n`;
+                 debugInfo += `  ID: ${task.id}\n`;
+                 debugInfo += `  日期: ${task.date}\n`;
+                 debugInfo += `  成员ID: ${task.staff}\n`;
+                 debugInfo += `  项目ID: ${task.project}\n`;
+                 debugInfo += `  子任务数: ${task.tasks ? task.tasks.length : 0}\n`;
+                 
+                 if (task.tasks) {
+                     task.tasks.forEach((subTask, subIndex) => {
+                         debugInfo += `    子任务 ${subIndex + 1}:\n`;
+                         debugInfo += `      类型: ${subTask.mainTask}\n`;
+                         debugInfo += `      描述: ${subTask.description}\n`;
+                         debugInfo += `      状态: ${subTask.status}\n`;
+                     });
+                 }
+                 debugInfo += '\n';
+             });
+         } else {
+             debugInfo += '❌ 没有找到任务数据\n';
+         }
+         
+         // 显示调试信息
+         alert(debugInfo);
+         
+         // 同时在控制台输出详细信息
+         console.log('任务调试信息已显示');
      }
 
 
@@ -1370,6 +1470,7 @@
         // 确保成员存在
         const staff = data.staff.find(s => s.id === staffId);
         if (!staff) {
+            
             alert('找不到对应的成员信息，请重新选择');
             return;
         }
