@@ -485,9 +485,9 @@
     let chart = null;
     let editingTaskId = null;
 
-    // 云端配置（可在本地存储中设置 sb_url、sb_key）
-    const SUPABASE_URL = localStorage.getItem('sb_url') || '';
-    const SUPABASE_ANON_KEY = localStorage.getItem('sb_key') || '';
+    // 云端配置（直接固定在代码中）
+    const SUPABASE_URL = 'https://ulqmodtnpqvwaocjpeiw.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVscW1vZHRucHF2d2FvY2pwZWl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyODcyNTYsImV4cCI6MjA3MTg2MzI1Nn0.Hp95Eob5QjgjgT1CW4TSSIJ3xRQEsgKh5fgmER0q9Bo';
     let sb = null; // Supabase 客户端
 
     async function initCloud() {
@@ -745,8 +745,9 @@
         if (adminPanelBtn) {
             adminPanelBtn.style.display = isAdmin ? 'inline-block' : 'none';
         }
+        // 云端配置按钮 - 已固定在代码中，隐藏按钮
         const cloudCfgBtn = document.getElementById('cloudCfgBtn');
-        if (cloudCfgBtn) cloudCfgBtn.style.display = isAdmin ? 'inline-block' : 'none';
+        if (cloudCfgBtn) cloudCfgBtn.style.display = 'none';
 
         initMainSystem();
     }
