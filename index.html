@@ -519,7 +519,7 @@
     }
 
     function saveUsers(users) {
-        saveUsers(users);
+        localStorage.setItem(USERS_KEY, JSON.stringify(users));
         cloudPush(USERS_KEY, users);
     }
 
