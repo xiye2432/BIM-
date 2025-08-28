@@ -391,7 +391,9 @@
                 <button onclick="viewAllTasks()" style="background: #9b59b6;">查看所有任务</button>
                 <button onclick="forceDeleteTask('1756261185209')" style="background: #e67e22;">删除问题任务</button>
                 <button onclick="fixTaskIdIssue()" style="background: #16a085;">修复ID问题</button>
-                <button onclick="clearAllTasks()" style="background: #e74c3c;">清空所有任务</button>
+                                 <button onclick="clearAllTasks()" style="background: #e74c3c;">清空所有任务</button>
+                 <button onclick="fixStaffNameIssue()" style="background: #8e44ad;">修复姓名显示</button>
+                 <button onclick="debugTaskTable()" style="background: #f39c12;">调试任务表格</button>
             </div>
             
             <!-- 表格视图 -->
@@ -556,6 +558,7 @@
         // 确保管理员账号存在
         if (!users['管理员']) {
             users['管理员'] = {
+                id: 1,
                 name: '管理员',
                 password: simpleEncrypt('123456'),
                 role: 'admin'
@@ -565,6 +568,7 @@
         // 确保测试账号存在
         if (!users['张三']) {
             users['张三'] = {
+                id: 2,
                 name: '张三',
                 password: simpleEncrypt('123'),
                 role: 'staff'
@@ -573,6 +577,7 @@
         
         if (!users['李四']) {
             users['李四'] = {
+                id: 3,
                 name: '李四',
                 password: simpleEncrypt('123'),
                 role: 'staff'
@@ -670,7 +675,9 @@
             }
 
             // 添加新用户 - 使用真实姓名作为用户名
+            const userId = Date.now();
             users[name] = {
+                id: userId,
                 name: name,
                 password: simpleEncrypt(password),
                 role: 'staff'  // 默认注册为普通成员
@@ -681,7 +688,7 @@
             // 同时添加到系统数据中的staff列表
             const data = getSystemData();
             const newStaff = {
-                id: Date.now(),
+                id: userId, // 使用相同的ID
                 name: name,
                 projects: []
             };
@@ -935,6 +942,15 @@
             // 兼容字符串/数字类型不一致，转为字符串比较
             const staff = data.staff.find(s => String(s.id) === String(task.staff));
             const project = data.projects.find(p => p.id === task.project);
+            
+            // 如果找不到成员，尝试通过用户数据查找
+            let staffName = staff?.name;
+            if (!staffName && task.staff) {
+                const users = JSON.parse(localStorage.getItem(USERS_KEY) || '{}');
+                // 尝试通过ID查找用户
+                const user = Object.values(users).find(u => u.id === task.staff);
+                if (user) staffName = user.name;
+            }
 
             task.tasks.forEach((t, index) => {
                 const taskId = `${task.id}-${index}`;
@@ -944,7 +960,7 @@
                 // 表格行
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                        <td class="name-cell">${staff?.name || task.staff}</td>
+                        <td class="name-cell">${staffName || staff?.name || task.staff}</td>
                         <td class="project-cell">${project?.name || task.project}</td>
                         <td class="task-content">${t.mainTask}: ${t.description}</td>
                         <td class="status-cell status-${statusClass}">${t.status}</td>
@@ -962,7 +978,7 @@
                 card.className = `task-card ${cardStatusClass}`;
                 card.innerHTML = `
                     <div class="task-card-header">
-                        <div class="task-card-title">${staff?.name || task.staff} - ${project?.name || task.project}</div>
+                        <div class="task-card-title">${staffName || staff?.name || task.staff} - ${project?.name || task.project}</div>
                         <div class="task-card-status ${cardStatusClass}">${t.status}</div>
                     </div>
                     <div class="task-card-content">
@@ -1305,6 +1321,79 @@
             location.reload();
         }, 1000);
     }
+    
+    // 修复成员姓名显示问题
+    function fixStaffNameIssue() {
+        const data = getSystemData();
+        const users = JSON.parse(localStorage.getItem(USERS_KEY) || '{}');
+        
+        console.log('修复前的任务数据:', data.tasks);
+        console.log('用户数据:', users);
+        
+        // 遍历所有任务，修复成员姓名显示
+        data.tasks.forEach(task => {
+            // 尝试通过用户数据找到对应的成员姓名
+            const user = Object.values(users).find(u => u.id === task.staff);
+            if (user) {
+                // 确保成员列表中也有这个用户
+                const existingStaff = data.staff.find(s => s.id === user.id);
+                if (!existingStaff) {
+                    data.staff.push({
+                        id: user.id,
+                        name: user.name,
+                        projects: []
+                    });
+                }
+            }
+        });
+        
+        console.log('修复后的任务数据:', data.tasks);
+        saveSystemData(data);
+        
+        // 刷新界面
+        updateTeamTasksTable(data.tasks);
+        updateProjectGantt(data.projects);
+        initChart(data.projects);
+        
+        alert('成员姓名显示问题已修复！');
+        
+        // 强制刷新页面
+        setTimeout(() => {
+            location.reload();
+        }, 1000);
+    }
+    
+    // 调试任务表格
+    function debugTaskTable() {
+        const tbody = document.getElementById('taskTableBody');
+        console.log('=== 任务表格调试信息 ===');
+        console.log('tbody元素:', tbody);
+        console.log('tbody.innerHTML:', tbody.innerHTML);
+        console.log('tbody.children.length:', tbody.children.length);
+        console.log('tbody.querySelectorAll("tr").length:', tbody.querySelectorAll('tr').length);
+        
+        // 尝试不同的选择器
+        const selectors = [
+            '#taskTableBody tr',
+            'table#taskTable tbody tr',
+            '.task-input',
+            'select.task-input'
+        ];
+        
+        selectors.forEach(selector => {
+            const elements = document.querySelectorAll(selector);
+            console.log(`选择器 "${selector}" 找到 ${elements.length} 个元素`);
+        });
+        
+        // 显示调试信息
+        let debugInfo = '=== 任务表格调试信息 ===\n';
+        debugInfo += `tbody元素存在: ${tbody ? '是' : '否'}\n`;
+        debugInfo += `tbody.innerHTML长度: ${tbody ? tbody.innerHTML.length : 0}\n`;
+        debugInfo += `tbody子元素数量: ${tbody ? tbody.children.length : 0}\n`;
+        debugInfo += `tr元素数量: ${tbody ? tbody.querySelectorAll('tr').length : 0}\n`;
+        
+        alert(debugInfo);
+    }
 
     // 视图切换功能
     function switchView(viewType) {
@@ -1391,6 +1480,8 @@
         }
 
         const tbody = document.querySelector('#taskTableBody');
+        console.log('添加任务行 - tbody元素:', tbody);
+        
         const newRow = document.createElement('tr');
         newRow.innerHTML = `
                 <td>${mainTask}: ${taskDesc}</td>
@@ -1405,6 +1496,9 @@
                 <td><button class="danger" onclick="this.parentNode.parentNode.remove()">删除</button></td>
             `;
         tbody.appendChild(newRow);
+        console.log('添加任务行后 - 表格内容:', tbody.innerHTML);
+        console.log('当前任务行数量:', tbody.querySelectorAll('tr').length);
+        
         document.getElementById('taskDesc').value = '';
     }
 
@@ -1418,8 +1512,35 @@
             alert('请选择姓名和项目');
             return;
         }
+        
+        // 确保成员存在
+        const staff = data.staff.find(s => s.id === staffId);
+        if (!staff) {
+            alert('找不到对应的成员信息，请重新选择');
+            return;
+        }
 
-        const taskRows = document.querySelectorAll('#taskTableBody tr');
+        // 尝试多种方式查找任务行
+        let taskRows = document.querySelectorAll('#taskTableBody tr');
+        console.log('方式1 - 找到的任务行数量:', taskRows.length);
+        
+        if(taskRows.length === 0) {
+            // 尝试其他选择器
+            taskRows = document.querySelectorAll('table#taskTable tbody tr');
+            console.log('方式2 - 找到的任务行数量:', taskRows.length);
+        }
+        
+        if(taskRows.length === 0) {
+            // 尝试更宽泛的选择器
+            taskRows = document.querySelectorAll('.task-input').length > 0 ? 
+                document.querySelectorAll('.task-input')[0].closest('tr') ? 
+                [document.querySelectorAll('.task-input')[0].closest('tr')] : [] : [];
+            console.log('方式3 - 找到的任务行数量:', taskRows.length);
+        }
+        
+        console.log('最终找到的任务行数量:', taskRows.length);
+        console.log('任务表格内容:', document.getElementById('taskTableBody').innerHTML);
+        
         if(taskRows.length === 0) {
             alert('请至少添加一个任务');
             return;
